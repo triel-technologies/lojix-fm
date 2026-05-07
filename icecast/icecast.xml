@@ -1,0 +1,97 @@
+<icecast>
+  <location>Indonesia</location>
+  <admin>admin@lojix.my.id</admin>
+
+  <limits>
+    <clients>200</clients>
+    <sources>10</sources>
+    <queue-size>524288</queue-size>
+    <client-timeout>30</client-timeout>
+    <header-timeout>15</header-timeout>
+    <source-timeout>10</source-timeout>
+    <burst-on-connect>1</burst-on-connect>
+    <burst-size>65536</burst-size>
+  </limits>
+
+  <authentication>
+    <source-password>isi_password_source_kuat_disini</source-password>
+    <relay-password>isi_password_relay_kuat_disini</relay-password>
+    <admin-user>admin</admin-user>
+    <admin-password>isi_password_admin_kuat_disini</admin-password>
+  </authentication>
+
+  <hostname>lojix.my.id</hostname>
+
+  <listen-socket>
+    <port>8000</port>
+  </listen-socket>
+
+  <!-- Stream HQ 320kbps -->
+  <mount type="normal">
+    <mount-name>/hq.mp3</mount-name>
+    <stream-name>LoJix FM HQ</stream-name>
+    <stream-description>LoJix FM — AI Radio | 320kbps</stream-description>
+    <stream-url>https://lojix.my.id</stream-url>
+    <genre>Synthwave Cyberpunk</genre>
+    <bitrate>320</bitrate>
+    <type>audio/mpeg</type>
+    <fallback-mount>/fallback.mp3</fallback-mount>
+    <fallback-override>1</fallback-override>
+    <max-listeners>100</max-listeners>
+  </mount>
+
+  <!-- Stream Standard 128kbps -->
+  <mount type="normal">
+    <mount-name>/live.mp3</mount-name>
+    <stream-name>LoJix FM</stream-name>
+    <stream-description>LoJix FM — AI Radio | 128kbps</stream-description>
+    <stream-url>https://lojix.my.id</stream-url>
+    <genre>Synthwave Cyberpunk</genre>
+    <bitrate>128</bitrate>
+    <type>audio/mpeg</type>
+    <fallback-mount>/fallback.mp3</fallback-mount>
+    <fallback-override>1</fallback-override>
+    <max-listeners>200</max-listeners>
+  </mount>
+
+  <!-- Stream Mobile 64kbps -->
+  <mount type="normal">
+    <mount-name>/mobile.mp3</mount-name>
+    <stream-name>LoJix FM Mobile</stream-name>
+    <stream-description>LoJix FM — AI Radio | 64kbps</stream-description>
+    <stream-url>https://lojix.my.id</stream-url>
+    <genre>Synthwave Cyberpunk</genre>
+    <bitrate>64</bitrate>
+    <type>audio/mpeg</type>
+    <fallback-mount>/fallback.mp3</fallback-mount>
+    <fallback-override>1</fallback-override>
+    <max-listeners>500</max-listeners>
+  </mount>
+
+  <!-- Fallback tersembunyi -->
+  <mount type="normal">
+    <mount-name>/fallback.mp3</mount-name>
+    <hidden>1</hidden>
+  </mount>
+
+  <fileserve>1</fileserve>
+
+  <paths>
+    <basedir>/usr/share/icecast2</basedir>
+    <logdir>/var/log/icecast2</logdir>
+    <webroot>/usr/share/icecast2/web</webroot>
+    <adminroot>/usr/share/icecast2/admin</adminroot>
+    <alias source="/" dest="/status.xsl"/>
+  </paths>
+
+  <logging>
+    <accesslog>access.log</accesslog>
+    <errorlog>error.log</errorlog>
+    <loglevel>3</loglevel>
+    <logsize>10000</logsize>
+  </logging>
+
+  <security>
+    <chroot>0</chroot>
+  </security>
+</icecast>

@@ -1,0 +1,33 @@
+version: "3.9"
+
+networks:
+  lojix-net:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  music-library:
+  tts-cache:
+  icecast-logs:
+  piper-models:
+
+services:
+  # Use same services as docker-compose.yml but bind public ports
+  nginx:
+    image: nginx:alpine
+    container_name: lojix-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/sites:/etc/nginx/conf.d:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    networks:
+      - lojix-net
+
+  # Other services: reuse local compose definitions
+  # For brevity, production stack mirrors docker-compose.yml but exposes public ports through nginx

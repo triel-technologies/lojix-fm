@@ -1,0 +1,242 @@
+version: "3.9"
+
+networks:
+  lojix-net:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  music-library:
+  tts-cache:
+  icecast-logs:
+  piper-models:
+
+services:
+
+  # ─── Icecast2
+  icecast:
+    image: moul/icecast:latest
+    container_name: lojix-icecast
+    restart: always
+    ports:
+      - "127.0.0.1:18000:8000"
+    volumes:
+      - ./icecast/icecast.xml:/etc/icecast2/icecast.xml:ro
+      - icecast-logs:/var/log/icecast2
+    networks:
+      - lojix-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/status.xsl"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── Librespot (Spotify Connect)
+  librespot:
+    image: ghcr.io/librespot-org/librespot:latest
+    container_name: lojix-librespot
+    restart: always
+    command: >
+      --name "LoJix FM"
+      --bitrate 320
+      --backend pipe
+      --initial-volume 100
+      --device-type speaker
+      --pipe /tmp/spotify_audio
+    networks:
+      - lojix-net
+
+  # ─── Liquidsoap
+  liquidsoap:
+    build:
+      context: ./liquidsoap
+      dockerfile: Dockerfile
+    container_name: lojix-liquidsoap
+    restart: always
+    depends_on:
+      - icecast
+      - redis
+    volumes:
+      - ./liquidsoap:/etc/liquidsoap:ro
+      - music-library:/music
+      - tts-cache:/tts
+    environment:
+      - ICECAST_HOST=icecast
+      - ICECAST_PORT=8000
+      - ICECAST_PASSWORD=${ICECAST_SOURCE_PASSWORD}
+      - REDIS_HOST=redis
+    networks:
+      - lojix-net
+
+  # ─── Piper TTS
+  piper:
+    image: ghcr.io/rhasspy/piper:latest
+    container_name: lojix-piper
+    restart: always
+    volumes:
+      - piper-models:/models
+      - tts-cache:/output
+    networks:
+      - lojix-net
+    entrypoint: ["/bin/sh", "-c", "sleep infinity"]
+
+  # ─── Redis
+  redis:
+    image: redis:7-alpine
+    container_name: lojix-redis
+    restart: always
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb
+    networks:
+      - lojix-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      retries: 5
+
+  # ─── MySQL
+  mysql:
+    image: mysql:8.0
+    container_name: lojix-mysql
+    restart: always
+    environment:
+      - MYSQL_DATABASE=lojixfm
+      - MYSQL_USER=${DB_USER}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - lojix-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      retries: 5
+
+  # ─── phpMyAdmin
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: lojix-phpmyadmin
+    restart: always
+    ports:
+      - "127.0.0.1:13002:80"
+    environment:
+      - PMA_HOST=mysql
+      - PMA_PORT=3306
+    depends_on:
+      - mysql
+    networks:
+      - lojix-net
+
+  # ─── NestJS Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lojix-backend
+    restart: always
+    ports:
+      - "127.0.0.1:13001:3001"
+    depends_on:
+      - postgres
+      - redis
+      - icecast
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=mysql://${DB_USER}:${DB_PASSWORD}@mysql:3306/lojixfm
+      - DB_HOST=mysql
+      - DB_NAME=lojixfm
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+      - ICECAST_HOST=icecast
+      - ICECAST_PORT=8000
+      - ICECAST_ADMIN_PASSWORD=${ICECAST_ADMIN_PASSWORD}
+      - LIQUIDSOAP_HOST=liquidsoap
+      - LIQUIDSOAP_PORT=1234
+      - PIPER_HOST=piper
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - FRONTEND_URL=${FRONTEND_URL}
+    volumes:
+      - music-library:/music
+      - tts-cache:/tts
+    networks:
+      - lojix-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/status"]
+      interval: 30s
+      retries: 3
+
+  # ─── Next.js Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: lojix-frontend
+    restart: always
+    ports:
+      - "127.0.0.1:13000:3000"
+    depends_on:
+      - backend
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+      - NEXT_PUBLIC_STREAM_URL=${NEXT_PUBLIC_STREAM_URL}
+      - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL}
+    networks:
+      - lojix-net
+
+  # ─── Discord Bot
+  discord-bot:
+    build:
+      context: ./discord-bot
+      dockerfile: Dockerfile
+    container_name: lojix-discord
+    restart: always
+    depends_on:
+      - backend
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - API_URL=http://backend:3001
+      - API_KEY=${BOT_API_KEY}
+    networks:
+      - lojix-net
+
+  # ─── Silence Watchdog
+  watchdog:
+    build:
+      context: ./watchdog
+      dockerfile: Dockerfile
+    container_name: lojix-watchdog
+    restart: always
+    environment:
+      - STREAM_URL=http://icecast:8000/live.mp3
+      - SILENCE_THRESHOLD_SECONDS=15
+      - REDIS_URL=redis://redis:6379
+      - ALERT_WEBHOOK=${DISCORD_WEBHOOK}
+    networks:
+      - lojix-net
+
+  # ─── Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: lojix-prometheus
+    restart: always
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - lojix-net
+
+  # ─── Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: lojix-grafana
+    restart: always
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_SERVER_ROOT_URL=https://${DOMAIN}/grafana
+    volumes:
+      - ./grafana:/var/lib/grafana
+    networks:
+      - lojix-net
