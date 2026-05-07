@@ -1,0 +1,16 @@
+.env
+node_modules/
+dist/
+.vscode/
+piper/models/
+tts-cache/
+postgres-data/
+mysql-data/
+redis-data/
+*.log
+.env.*
+/.idea/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+/.DS_Store
