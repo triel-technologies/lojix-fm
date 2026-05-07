@@ -1,11 +1,9 @@
-version: "3.9"
-
 networks:
   lojix-net:
     driver: bridge
 
 volumes:
-  postgres-data:
+  mysql-data:
   redis-data:
   music-library:
   tts-cache:
@@ -107,7 +105,7 @@ services:
       - MYSQL_PASSWORD=${DB_PASSWORD}
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
     volumes:
-      - postgres-data:/var/lib/mysql
+      - mysql-data:/var/lib/mysql
       - ./mysql/init:/docker-entrypoint-initdb.d:ro
     networks:
       - lojix-net
@@ -141,7 +139,7 @@ services:
     ports:
       - "127.0.0.1:13001:3001"
     depends_on:
-      - postgres
+      - mysql
       - redis
       - icecast
     environment:
