@@ -1,4 +1,4 @@
-# LoJix FM — Autonomous AI Radio (aaPanel / Apache deployment)
+# LoJix FM
 
 This repository contains scaffolding and configs to run LoJix FM on an Ubuntu server with aaPanel/Apache.
 
